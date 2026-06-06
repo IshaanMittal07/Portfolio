@@ -73,6 +73,7 @@ type Experience = {
   tags: string[];
   logo: string;
   logoUrl: string;
+  linkedInUrl?: string;
 };
 
 type SkillGroup = {
@@ -81,12 +82,9 @@ type SkillGroup = {
 };
 
 const navItems: NavItem[] = [
-  { id: "home", label: "Home", Icon: Home },
   { id: "about", label: "About", Icon: UserRound },
-  { id: "projects", label: "Projects", Icon: Folder },
   { id: "experience", label: "Experience", Icon: Briefcase },
-  { id: "skills", label: "Skills", Icon: Code2 },
-  { id: "education", label: "Education", Icon: GraduationCap },
+  { id: "projects", label: "Projects", Icon: Folder },
   { id: "contact", label: "Contact", Icon: Mail }
 ];
 
@@ -152,37 +150,41 @@ const experiences: Experience[] = [
     date: "Mar. 2026 - Present",
     role: "Quantum Hardware/Software Development Intern",
     company: "SQE.io",
-    body: "Implementing quantum-safe financial transactions and encrypted communication systems with Python, TypeScript, TLS, ESP32, Raspberry Pi, RS485, and Modbus.",
+    body: "Building quantum-safe transaction systems across software, embedded hardware, and secure communication protocols.",
     tags: ["Python", "TypeScript", "Hardware"],
-    logo: "SQ",
-    logoUrl: "https://logo.clearbit.com/sqe.io"
+    logo: "SQE",
+    logoUrl: "https://logo.clearbit.com/sqe.io",
+    linkedInUrl: "https://www.linkedin.com/company/sqe-io/"
   },
   {
     date: "Feb. 2026 - May 2026",
     role: "Software Development Intern",
     company: "Clouds Analytics",
-    body: "Developed secure full-stack web applications with React, Python, and Flask while supporting SOC 2, vulnerability assessment, and secure coding work.",
+    body: "Built secure React, Python, and Flask applications supporting SOC 2 and vulnerability assessment work.",
     tags: ["React", "Python", "Flask"],
     logo: "CA",
-    logoUrl: "https://logo.clearbit.com/cloudsanalytics.com"
+    logoUrl: "https://logo.clearbit.com/cloudsanalytics.com",
+    linkedInUrl: "https://www.linkedin.com/company/clouds-analytics/"
   },
   {
     date: "Sept. 2025 - Dec. 2025",
     role: "Autonomy Software Developer",
     company: "Waterloo Aerial Robotics Group",
-    body: "Engineered a Python ground station using MAVLink, multi-process architecture, and computer vision to improve drone communication and orientation accuracy.",
+    body: "Engineered a MAVLink ground station for drone autonomy, computer vision, and communication workflows.",
     tags: ["Python", "MAVLink", "OpenCV"],
-    logo: "UW",
-    logoUrl: "https://logo.clearbit.com/uwarg.com"
+    logo: "WARG",
+    logoUrl: "https://logo.clearbit.com/uwarg.com",
+    linkedInUrl: "https://www.linkedin.com/company/waterloo-aerial-robotics-group/"
   },
   {
     date: "Jul. 2025 - Sept. 2025",
     role: "Cybersecurity Intern",
     company: "NetraScale",
-    body: "Built React/FastAPI dashboards, Chart.js visuals, and LLM-assisted summaries that made cybersecurity policy and threat analysis easier to understand.",
+    body: "Built React and FastAPI dashboards with Chart.js visuals and LLM-assisted cybersecurity summaries.",
     tags: ["React", "FastAPI", "Chart.js"],
     logo: "NS",
-    logoUrl: "https://logo.clearbit.com/netrascale.com"
+    logoUrl: "https://logo.clearbit.com/netrascale.com",
+    linkedInUrl: "https://www.linkedin.com/company/netrascale/"
   }
 ];
 
@@ -395,16 +397,13 @@ function Hero() {
         </div>
       </div>
       <motion.div className="hero-copy" initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75 }}>
-        <h2>Computer engineer building secure software systems.</h2>
-        <p>Computer Engineering student at the University of Waterloo building backend, robotics, computer vision, and cybersecurity projects.</p>
+        <h2>Ishaan Mittal</h2>
+        <p>Computer Engineering @ University of Waterloo - Building things that work in the real world.</p>
         <div className="hero-actions">
-          <a className="button button-primary" href="#projects">
-            View Projects <ExternalLink aria-hidden="true" />
-          </a>
           <a className="button" href="#contact">
             Contact Me <ExternalLink aria-hidden="true" />
           </a>
-          <a className="button" href="/assets/IshaanMittal.pdf">
+          <a className="button button-primary" href="/assets/IshaanMittal.pdf">
             Download Resume <Download aria-hidden="true" />
           </a>
         </div>
@@ -418,8 +417,7 @@ function About() {
     <motion.section className="about section-rule" id="about" initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={sectionVariants}>
       <div className="about-copy">
         <p className="label">About Me</p>
-        <p>Hey, I am Ishaan, a Computer Engineering student at the University of Waterloo building software at the intersection of engineering, automation, and real-world impact.</p>
-        <p>I have built projects across medical AI, banking, robotics, and cybersecurity, and I like taking ideas from zero to working product.</p>
+        <p>Computer Engineering student at Waterloo building software across robotics, vision, cybersecurity, and backend systems.</p>
       </div>
       <ValueCard title="Problem Solver" icon={<Code2 aria-hidden="true" />} body="I break down technical systems and turn them into working tools." />
       <ValueCard title="Product Builder" icon={<Folder aria-hidden="true" />} body="I care about useful workflows, clean interfaces, and reliable systems." />
@@ -573,13 +571,33 @@ function Experience() {
 
 function LogoMark({ experience }: { experience: Experience }) {
   const [failed, setFailed] = useState(false);
+  const content = !failed ? (
+    <img
+      src={experience.logoUrl}
+      alt={`${experience.company} logo`}
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <span>{experience.logo}</span>
+  );
+
+  if (experience.linkedInUrl) {
+    return (
+      <a
+        className="company-logo"
+        href={experience.linkedInUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${experience.company} LinkedIn page`}
+      >
+        {content}
+      </a>
+    );
+  }
+
   return (
     <div className="company-logo" aria-label={`${experience.company} logo`}>
-      {!failed ? (
-        <img src={experience.logoUrl} alt="" onError={() => setFailed(true)} />
-      ) : (
-        <span>{experience.logo}</span>
-      )}
+      {content}
     </div>
   );
 }
@@ -610,10 +628,23 @@ function BottomPanels() {
     <motion.section className="bottom-panels" initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} variants={sectionVariants}>
       <article className="education-card" id="education">
         <p className="label">Education</p>
-        <h3>University of Waterloo</h3>
-        <p>Candidate for BASc, Computer Engineering</p>
+        <div className="education-heading">
+          <img
+            className="edu-logo"
+            src="https://uwaterloo.ca/brand/sites/ca.brand/files/uploads/images/universityofwaterloo_logo_horiz_rgb_0.png"
+            alt="University of Waterloo"
+            height="48"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+          />
+          <div>
+            <h3>University of Waterloo</h3>
+            <p>Candidate for BASc, Computer Engineering</p>
+          </div>
+        </div>
         <time>Sept. 2025 - Present</time>
-        <p>Relevant focus: secure software, systems, robotics, computer vision, backend development, and hardware communication.</p>
+        <p>Focus: secure software, systems, robotics, computer vision, backend development, and hardware communication.</p>
       </article>
 
       <article className="contact-card" id="contact">
