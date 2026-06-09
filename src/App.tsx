@@ -636,16 +636,6 @@ function About() {
   );
 }
 
-function ValueCard({ title, body, icon }: { title: string; body: string; icon: ReactNode }) {
-  return (
-    <article className="value-card card reveal">
-      <span>{icon}</span>
-      <h3>{title}</h3>
-      <p>{body}</p>
-    </article>
-  );
-}
-
 function Experience() {
   return (
     <section className="experience section-rule" id="experience">
