@@ -367,7 +367,7 @@ function closePanel(
 
 function App() {
   const [activeSection, setActiveSection] = useState("home");
-  const [theme, setTheme] = useState<"light" | "dark">(() => (new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light"));
+  const [theme, setTheme] = useState<"light" | "dark">(() => (new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark"));
   const [activePanel, setActivePanel] = useState<"esports" | "training" | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const sectionIds = useMemo(() => ["home", ...sectionNavItems.map((item) => item.id)], []);
