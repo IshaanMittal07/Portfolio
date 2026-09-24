@@ -44,8 +44,10 @@ import {
 } from "react-icons/si";
 import { VscVscode } from "react-icons/vsc";
 import { TbBrain, TbCircuitResistor, TbHexagonLetterY } from "react-icons/tb";
-import type { ComponentType, CSSProperties, Dispatch, ReactNode, SetStateAction, SVGProps } from "react";
+import type { ComponentType, CSSProperties, ReactNode, SVGProps } from "react";
 import { useEffect, useMemo, useState } from "react";
+
+type Panel = "esports" | "training";
 
 type NavItem = {
   id: string;
@@ -68,7 +70,7 @@ type Project = {
   imageAlt: string;
 };
 
-type Experience = {
+type ExperienceItem = {
   date: string;
   role: string;
   company: string;
@@ -185,7 +187,7 @@ const projects: Project[] = [
   }
 ];
 
-const experiences: Experience[] = [
+const experiences: ExperienceItem[] = [
   {
     date: "Mar. 2026 - Present",
     role: "Quantum Hardware/Software Development Intern",
@@ -336,41 +338,30 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function openPanel(
-  panel: "esports" | "training",
-  setActivePanel: Dispatch<SetStateAction<"esports" | "training" | null>>,
-  setActiveProject: Dispatch<SetStateAction<Project | null>>
-) {
-  setActiveProject(null);
-  setActivePanel(panel);
-  window.history.pushState(null, "", `#${panel}`);
-}
-
-function openProject(
-  project: Project,
-  setActivePanel: Dispatch<SetStateAction<"esports" | "training" | null>>,
-  setActiveProject: Dispatch<SetStateAction<Project | null>>
-) {
-  setActivePanel(null);
-  setActiveProject(project);
-  window.history.pushState(null, "", `#project-${slugify(project.title)}`);
-}
-
-function closePanel(
-  setActivePanel: Dispatch<SetStateAction<"esports" | "training" | null>>,
-  setActiveProject: Dispatch<SetStateAction<Project | null>>
-) {
-  setActivePanel(null);
-  setActiveProject(null);
-  window.history.pushState(null, "", "#projects");
-}
-
 function App() {
   const [activeSection, setActiveSection] = useState("home");
   const [theme, setTheme] = useState<"light" | "dark">(() => (new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark"));
-  const [activePanel, setActivePanel] = useState<"esports" | "training" | null>(null);
+  const [activePanel, setActivePanel] = useState<Panel | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const sectionIds = useMemo(() => ["home", ...sectionNavItems.map((item) => item.id)], []);
+
+  const openPanel = (panel: Panel) => {
+    setActiveProject(null);
+    setActivePanel(panel);
+    window.history.pushState(null, "", `#${panel}`);
+  };
+
+  const openProject = (project: Project) => {
+    setActivePanel(null);
+    setActiveProject(project);
+    window.history.pushState(null, "", `#project-${slugify(project.title)}`);
+  };
+
+  const closePanel = () => {
+    setActivePanel(null);
+    setActiveProject(null);
+    window.history.pushState(null, "", "#projects");
+  };
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -411,8 +402,8 @@ function App() {
           const element = document.getElementById(id);
           return element ? { id, top: Math.abs(element.getBoundingClientRect().top - 92) } : null;
         })
-        .filter(Boolean)
-        .sort((a, b) => a!.top - b!.top)[0];
+        .filter((entry): entry is { id: string; top: number } => entry !== null)
+        .sort((a, b) => a.top - b.top)[0];
 
       if (current) setActiveSection(current.id);
     };
@@ -446,9 +437,7 @@ function App() {
       <Sidebar
         activeSection={activeSection}
         activePanel={activePanel}
-        onOpenPanel={(panel) => {
-          openPanel(panel, setActivePanel, setActiveProject);
-        }}
+        onOpenPanel={openPanel}
       />
       <main className="content">
         <Header
@@ -458,18 +447,18 @@ function App() {
         <Hero />
         <About />
         <Experience />
-        <Projects onOpenProject={(project) => openProject(project, setActivePanel, setActiveProject)} />
+        <Projects onOpenProject={openProject} />
         <Skills />
         <Education />
         <Contact />
       </main>
       {activePanel && (
-        <PanelShell tone={activePanel} onBack={() => closePanel(setActivePanel, setActiveProject)}>
+        <PanelShell tone={activePanel} onBack={closePanel}>
           {activePanel === "esports" ? <EsportsPanel /> : <TrainingPanel />}
         </PanelShell>
       )}
       {activeProject && (
-        <PanelShell tone="project" onBack={() => closePanel(setActivePanel, setActiveProject)}>
+        <PanelShell tone="project" onBack={closePanel}>
           <ProjectPanel project={activeProject} />
         </PanelShell>
       )}
@@ -483,8 +472,8 @@ function Sidebar({
   onOpenPanel
 }: {
   activeSection: string;
-  activePanel: "esports" | "training" | null;
-  onOpenPanel: (panel: "esports" | "training") => void;
+  activePanel: Panel | null;
+  onOpenPanel: (panel: Panel) => void;
 }) {
   return (
     <aside className="sidebar" id="primary-sidebar">
@@ -513,7 +502,7 @@ function Sidebar({
             type="button"
             className={`nav-link nav-button ${activePanel === id ? "active" : ""}`}
             style={{ animationDelay: `${(sectionNavItems.length + index) * 0.05}s` }}
-            onClick={() => onOpenPanel(id as "esports" | "training")}
+            onClick={() => onOpenPanel(id as Panel)}
           >
             <Icon aria-hidden="true" />
             {label}
@@ -655,7 +644,7 @@ function Experience() {
   );
 }
 
-function LogoMark({ experience }: { experience: Experience }) {
+function LogoMark({ experience }: { experience: ExperienceItem }) {
   const [failed, setFailed] = useState(false);
   const content = !failed ? (
     <img src={experience.logoSrc} alt={`${experience.company} logo`} onError={() => setFailed(true)} />
@@ -820,10 +809,19 @@ function PanelShell({
   children,
   onBack
 }: {
-  tone: "project" | "esports" | "training";
+  tone: "project" | Panel;
   children: ReactNode;
   onBack: () => void;
 }) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onBack();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack]);
+
   return (
     <div className={`panel-overlay ${tone}`} role="dialog" aria-modal="true">
       <section className="panel-tab">
