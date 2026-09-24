@@ -14,6 +14,8 @@ import {
   Moon,
   ShieldCheck,
   Sun,
+  TrendingDown,
+  TrendingUp,
   Trophy,
   UserRound
 } from "lucide-react";
@@ -44,8 +46,15 @@ import {
 } from "react-icons/si";
 import { VscVscode } from "react-icons/vsc";
 import { TbBrain, TbCircuitResistor, TbHexagonLetterY } from "react-icons/tb";
-import type { ComponentType, CSSProperties, ReactNode, SVGProps } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type {
+  ComponentType,
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  SVGProps
+} from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type Panel = "esports" | "training";
 
@@ -309,29 +318,23 @@ const organizations = [
   { initials: "PL", name: "Power League Squad", role: "Captain", years: "2024 - Now" }
 ];
 
+type WeightPoint = { date: string; value: number };
+
+// Written by scripts/sync_fitness.py from MyFitnessPal.
+type FitnessData = {
+  lastSynced: string;
+  nutrition: { daysLogged: number; calories: number; protein: number; carbs: number; fat: number };
+  weightUnit: string;
+  weight: WeightPoint[];
+};
+
 const trainingData = {
-  nutrition: {
-    calories: "2,400 kcal",
-    protein: "185g",
-    carbs: "240g",
-    fat: "70g",
-    source: "MyFitnessPal",
-    lastSynced: "June 7, 2026"
-  },
   activity: {
     stepsAverage: 8400,
     stepsGoal: 10000,
     activeDays: "22 / 30",
     workoutDuration: "58 min"
-  },
-  weight: [
-    { label: "W1", value: 172 },
-    { label: "W2", value: 171 },
-    { label: "W3", value: 170 },
-    { label: "W4", value: 169 },
-    { label: "W5", value: 168 },
-    { label: "W6", value: 168 }
-  ]
+  }
 };
 
 function slugify(value: string) {
@@ -763,7 +766,37 @@ function EsportsPanel() {
   );
 }
 
+function useFitnessData() {
+  const [data, setData] = useState<FitnessData | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/data/fitness.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<FitnessData>;
+      })
+      .then((json) => {
+        if (!cancelled) setData(json);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { data, failed };
+}
+
+function formatSyncDate(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
 function TrainingPanel() {
+  const { data: fitness, failed } = useFitnessData();
   const progress = Math.min((trainingData.activity.stepsAverage / trainingData.activity.stepsGoal) * 100, 100);
 
   return (
@@ -777,13 +810,20 @@ function TrainingPanel() {
       <div className="feature-grid">
         <article className="card nutrition-card">
           <h3>Nutrition</h3>
-          {/* Wire this static snapshot to MyFitnessPal when an API source is available. */}
-          <NutritionRow label="Calories" value={trainingData.nutrition.calories} />
-          <NutritionRow label="Protein" value={trainingData.nutrition.protein} />
-          <NutritionRow label="Carbs" value={trainingData.nutrition.carbs} />
-          <NutritionRow label="Fat" value={trainingData.nutrition.fat} />
-          <NutritionRow label="Source" value={trainingData.nutrition.source} />
-          <footer>Last synced: {trainingData.nutrition.lastSynced}</footer>
+          {fitness ? (
+            <>
+              <NutritionRow label="Calories" value={`${fitness.nutrition.calories.toLocaleString()} kcal`} />
+              <NutritionRow label="Protein" value={`${fitness.nutrition.protein}g`} />
+              <NutritionRow label="Carbs" value={`${fitness.nutrition.carbs}g`} />
+              <NutritionRow label="Fat" value={`${fitness.nutrition.fat}g`} />
+              <NutritionRow label="Source" value="MyFitnessPal" />
+              <footer>
+                Daily average over {fitness.nutrition.daysLogged} logged days · Last synced: {formatSyncDate(fitness.lastSynced)}
+              </footer>
+            </>
+          ) : (
+            <p>{failed ? "Nutrition data is unavailable right now." : "Loading nutrition data..."}</p>
+          )}
         </article>
         <article className="card activity-card">
           <h3>Activity Stats</h3>
@@ -797,7 +837,11 @@ function TrainingPanel() {
         </article>
         <article className="card chart-card">
           <h3>Weight Curve</h3>
-          <WeightChart data={trainingData.weight} />
+          {fitness && fitness.weight.length > 0 ? (
+            <WeightChart data={fitness.weight} unit={fitness.weightUnit} />
+          ) : (
+            <p>{failed || fitness ? "Weight data is unavailable right now." : "Loading weight data..."}</p>
+          )}
         </article>
       </div>
     </div>
@@ -884,33 +928,231 @@ function NutritionRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WeightChart({ data }: { data: { label: string; value: number }[] }) {
-  const width = 310;
-  const height = 172;
-  const padding = 30;
-  const min = Math.min(...data.map((point) => point.value)) - 2;
-  const max = Math.max(...data.map((point) => point.value)) + 2;
-  const points = data.map((point, index) => {
-    const x = padding + (index * (width - padding * 2)) / (data.length - 1);
-    const y = padding + ((max - point.value) * (height - padding * 2)) / (max - min);
-    return { ...point, x, y };
-  });
-  const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+const weightRanges = [
+  { id: "3M", months: 3 },
+  { id: "6M", months: 6 },
+  { id: "1Y", months: 12 },
+  { id: "All", months: null }
+] as const;
+
+type WeightRange = (typeof weightRanges)[number]["id"];
+
+function parseIsoDate(isoDate: string) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatWeight(value: number, unit: string) {
+  return `${Number(value.toFixed(1))} ${unit}`;
+}
+
+// Round an axis step to 1, 2, 5, or 10 times a power of ten so tick labels stay readable.
+function niceStep(span: number, targetTicks: number) {
+  const raw = span / targetTicks;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const normalized = raw / magnitude;
+  return (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+}
+
+function WeightChart({ data, unit }: { data: WeightPoint[]; unit: string }) {
+  const [range, setRange] = useState<WeightRange>("All");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const gradientId = useId();
+
+  const allPoints = useMemo(
+    () => data.map((point) => ({ ...point, time: parseIsoDate(point.date).getTime() })).sort((a, b) => a.time - b.time),
+    [data]
+  );
+  const visible = useMemo(() => {
+    const months = weightRanges.find((option) => option.id === range)?.months;
+    if (!months) return allPoints;
+    const last = new Date(allPoints[allPoints.length - 1].time);
+    const cutoff = new Date(last.getFullYear(), last.getMonth() - months, last.getDate()).getTime();
+    return allPoints.filter((point) => point.time >= cutoff);
+  }, [allPoints, range]);
+
+  // Draw at the rendered pixel width so labels keep their real font size on small screens.
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(640);
+  useEffect(() => {
+    const element = plotRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(Math.round(entry.contentRect.width), 240)));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const height = width < 480 ? 220 : 260;
+  const margin = { top: 16, right: 18, bottom: 30, left: 40 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+
+  const values = visible.map((point) => point.value);
+  const yStep = niceStep(Math.max(Math.max(...values) - Math.min(...values), 4), 4);
+  const yMin = Math.floor(Math.min(...values) / yStep) * yStep;
+  const yMax = Math.max(Math.ceil(Math.max(...values) / yStep) * yStep, yMin + yStep);
+  const halfMonth = 15 * 24 * 60 * 60 * 1000;
+  const tMin = visible[0].time - (visible.length === 1 ? halfMonth : 0);
+  const tMax = visible[visible.length - 1].time + (visible.length === 1 ? halfMonth : 0);
+
+  const xFor = (time: number) => margin.left + ((time - tMin) / (tMax - tMin)) * plotWidth;
+  const yFor = (value: number) => margin.top + ((yMax - value) / (yMax - yMin)) * plotHeight;
+  const points = visible.map((point) => ({ ...point, x: xFor(point.time), y: yFor(point.value) }));
+
+  const yTicks = Array.from({ length: Math.round((yMax - yMin) / yStep) + 1 }, (_, index) => yMin + index * yStep);
+  const first = new Date(tMin);
+  const last = new Date(tMax);
+  const spanMonths = (last.getFullYear() - first.getFullYear()) * 12 + last.getMonth() - first.getMonth();
+  const monthStep = Math.max(1, Math.ceil(spanMonths / Math.max(2, Math.floor(plotWidth / 90))));
+  const xTicks: Date[] = [];
+  for (
+    let tick = new Date(first.getFullYear(), first.getMonth() + 1, 1);
+    tick.getTime() <= tMax;
+    tick = new Date(tick.getFullYear(), tick.getMonth() + monthStep, 1)
+  ) {
+    xTicks.push(tick);
+  }
+
+  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const baseline = margin.top + plotHeight;
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`;
+
+  const start = visible[0];
+  const current = visible[visible.length - 1];
+  const change = current.value - start.value;
+  const changePercent = (change / start.value) * 100;
+  const active = activeIndex === null ? null : points[activeIndex];
+  const ChangeIcon = change <= 0 ? TrendingDown : TrendingUp;
+
+  const selectNearest = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * width;
+    let nearest = 0;
+    points.forEach((point, index) => {
+      if (Math.abs(point.x - x) < Math.abs(points[nearest].x - x)) nearest = index;
+    });
+    setActiveIndex(nearest);
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<SVGSVGElement>) => {
+    const lastIndex = points.length - 1;
+    const moves: Record<string, number> = {
+      ArrowLeft: Math.max((activeIndex ?? lastIndex) - 1, 0),
+      ArrowRight: Math.min((activeIndex ?? lastIndex) + 1, lastIndex),
+      Home: 0,
+      End: lastIndex
+    };
+    if (event.key in moves) {
+      event.preventDefault();
+      setActiveIndex(moves[event.key]);
+    }
+  };
 
   return (
-    <svg className="weight-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Weight trend line chart">
-      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
-      <line x1={padding} y1={padding} x2={padding} y2={height - padding} />
-      <path d={path} />
-      {points.map((point) => (
-        <g key={point.label}>
-          <circle cx={point.x} cy={point.y} r="5" />
-          <text x={point.x} y={height - 10} textAnchor="middle">{point.label}</text>
-        </g>
-      ))}
-      <text x="6" y={padding + 4}>{max} lb</text>
-      <text x="6" y={height - padding + 4}>{min} lb</text>
-    </svg>
+    <div className="weight-panel">
+      <div className="weight-toolbar">
+        <div className="weight-stats">
+          <div className="weight-stat">
+            <span>Start</span>
+            <strong>{formatWeight(start.value, unit)}</strong>
+            <small>{formatShortDate(new Date(start.time))}</small>
+          </div>
+          <div className="weight-stat">
+            <span>Current</span>
+            <strong>{formatWeight(current.value, unit)}</strong>
+            <small>{formatShortDate(new Date(current.time))}</small>
+          </div>
+          <div className="weight-stat weight-change">
+            <span>Change</span>
+            <strong>
+              <ChangeIcon aria-hidden="true" />
+              {formatWeight(Math.abs(change), unit)}
+            </strong>
+            <small>({changePercent > 0 ? "+" : ""}{changePercent.toFixed(1)}%)</small>
+          </div>
+        </div>
+        <div className="range-toggle" role="group" aria-label="Weight chart range">
+          {weightRanges.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={range === option.id}
+              onClick={() => {
+                setRange(option.id);
+                setActiveIndex(null);
+              }}
+            >
+              {option.id}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="weight-chart-plot" ref={plotRef}>
+        <svg
+          className="weight-chart"
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          tabIndex={0}
+          aria-label={`Weight from ${formatWeight(start.value, unit)} to ${formatWeight(current.value, unit)} over ${visible.length} weigh-ins. Use arrow keys to inspect entries.`}
+          onPointerMove={selectNearest}
+          onPointerDown={selectNearest}
+          onPointerLeave={(event) => {
+            if (event.pointerType === "mouse") setActiveIndex(null);
+          }}
+          onFocus={() => setActiveIndex((index) => index ?? points.length - 1)}
+          onBlur={() => setActiveIndex(null)}
+          onKeyDown={handleKeyDown}
+        >
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: "var(--primary)", stopOpacity: 0.28 }} />
+              <stop offset="100%" style={{ stopColor: "var(--primary)", stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
+          {yTicks.map((tick) => (
+            <g key={tick}>
+              <line className="grid-line" x1={margin.left} x2={width - margin.right} y1={yFor(tick)} y2={yFor(tick)} />
+              <text x={margin.left - 8} y={yFor(tick) + 4} textAnchor="end">{tick}</text>
+            </g>
+          ))}
+          {xTicks.map((tick) => (
+            <text key={tick.getTime()} x={xFor(tick.getTime())} y={height - 8} textAnchor="middle">
+              {`${tick.toLocaleDateString("en-US", { month: "short" })} '${String(tick.getFullYear()).slice(2)}`}
+            </text>
+          ))}
+          <path className="area" d={areaPath} fill={`url(#${gradientId})`} />
+          <path className="line" d={linePath} />
+          {active && <line className="guide" x1={active.x} x2={active.x} y1={margin.top} y2={baseline} />}
+          {points.map((point, index) => (
+            <circle
+              key={point.date}
+              className={`point ${index === activeIndex ? "active" : ""}`}
+              cx={point.x}
+              cy={point.y}
+              r={index === activeIndex ? 6 : 3.5}
+            />
+          ))}
+        </svg>
+        {active && (
+          <div
+            className="weight-tooltip"
+            style={{
+              left: `${(active.x / width) * 100}%`,
+              top: `${(active.y / height) * 100}%`,
+              transform: `translate(${active.x / width > 0.8 ? "-100%" : active.x / width < 0.2 ? "0" : "-50%"}, calc(-100% - 12px))`
+            }}
+          >
+            <strong>{formatWeight(active.value, unit)}</strong>
+            {formatShortDate(new Date(active.time))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

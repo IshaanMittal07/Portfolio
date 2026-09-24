@@ -3,3 +3,8 @@ dist/
 *.log
 .DS_Store
 .vercel
+
+# MyFitnessPal session for scripts/sync_fitness.py
+scripts/.mfp-cookies
+scripts/.mfp-user-agent
+scripts/.mfp-browser/
